@@ -55,15 +55,25 @@ with st.sidebar:
 
 # --- Main Dashboard ---
 if st.session_state.players is not None:
+    # --- UPDATED: HH:MM Time Calculation ---
     end_time = st.session_state.start_time + timedelta(hours=rental_hours)
-    time_left = end_time - datetime.now()
-    minutes_left = max(0, int(time_left.total_seconds() / 60))
+    time_delta = end_time - datetime.now()
+    total_seconds = int(time_delta.total_seconds())
+    
+    if total_seconds > 0:
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        time_display = f"{hours:02d}:{minutes:02d}"
+    else:
+        time_display = "00:00"
 
     t_col1, t_col2, t_col3 = st.columns(3)
     t_col1.metric("Current Round", st.session_state.round)
     t_col2.metric("Target Score", target_score)
-    t_col3.metric("Time Remaining", f"{minutes_left} min", 
-                  delta="- Urgent" if minutes_left < 15 else None, delta_color="inverse")
+    # Metric shows HH:MM format
+    t_col3.metric("Time Remaining", time_display, 
+                  delta="- Urgent" if total_seconds < 900 and total_seconds > 0 else None, 
+                  delta_color="inverse")
 
     st.divider()
     col_play, col_rank = st.columns([2.5, 1])
@@ -74,7 +84,6 @@ if st.session_state.players is not None:
         sorted_list = st.session_state.players.sort_values(by='Points', ascending=False)['Player ID'].tolist()
         
         on_court = sorted_list[:num_courts * 4]
-        waiting = sorted_list[num_courts * 4:]
         
         scores_update = {}
         all_courts_finished = True 
@@ -90,27 +99,21 @@ if st.session_state.players is not None:
                 if s1_key not in st.session_state: st.session_state[s1_key] = 0
                 if s2_key not in st.session_state: st.session_state[s2_key] = 0
                 
-                s1 = st.session_state[s1_key]
-                s2 = st.session_state[s2_key]
+                s1, s2 = st.session_state[s1_key], st.session_state[s2_key]
                 is_finished = s1 >= target_score or s2 >= target_score
                 if not is_finished: all_courts_finished = False
 
                 with st.container(border=True):
                     st.markdown(f"### 🏟️ Court {label} {'✅' if is_finished else '🔥'}")
                     
-                    # Logic for Service Rotation
                     total_pts = s1 + s2
                     rotation = [p1, p3, p2, p4] 
                     server_idx = (total_pts // 4) % 4
-                    side_idx = total_pts % 2 # 0: Right (Deuce), 1: Left (Ad)
-                    
-                    # Layout as per uploaded image
-                    # [TEAM 1 Names] [COURT VISUAL] [TEAM 2 Names]
-                    # [Score +/-]                   [Score +/-]
+                    side_idx = total_pts % 2 
                     
                     c1, c2, c3 = st.columns([1, 2, 1])
                     
-                    with c1: # TEAM 1 Left
+                    with c1: # TEAM 1
                         st.caption("TEAM 1")
                         st.markdown(f"<div style='border:1px solid black; padding:5px; text-align:center; {'background-color:#c6efce; font-weight:bold;' if server_idx==0 and not is_finished else ''}'>{p1}</div>", unsafe_allow_html=True)
                         st.markdown(f"<div style='border:1px solid black; padding:5px; text-align:center; {'background-color:#c6efce; font-weight:bold;' if server_idx==2 and not is_finished else ''}'>{p2}</div>", unsafe_allow_html=True)
@@ -118,23 +121,18 @@ if st.session_state.players is not None:
                         if not is_finished:
                             b1_col1, b1_col2 = st.columns(2)
                             if b1_col1.button("＋", key=f"p1_{label}", use_container_width=True):
-                                st.session_state[s1_key] = min(target_score, s1 + 1)
-                                st.rerun()
+                                st.session_state[s1_key] = min(target_score, s1 + 1); st.rerun()
                             if b1_col2.button("－", key=f"m1_{label}", use_container_width=True):
-                                st.session_state[s1_key] = max(0, s1 - 1)
-                                st.rerun()
+                                st.session_state[s1_key] = max(0, s1 - 1); st.rerun()
 
-                    with c2: # Court Graphic
+                    with c2: # Court Visual
                         court_colors = ["white", "white", "white", "white"] 
                         if not is_finished:
-                            # Highlight server zone
-                            if server_idx == 0 or server_idx == 2: # T1 Serving
-                                court_colors[2 if side_idx == 0 else 0] = "#c6efce"
-                            else: # T2 Serving
-                                court_colors[1 if side_idx == 0 else 3] = "#c6efce"
+                            if server_idx == 0 or server_idx == 2: court_colors[2 if side_idx == 0 else 0] = "#c6efce"
+                            else: court_colors[1 if side_idx == 0 else 3] = "#c6efce"
 
                         court_html = f"""
-                        <div style="display: grid; grid-template-columns: 1fr 10px 1fr; grid-template-rows: 80px 80px; border: 2px solid black; background-color: white; margin: 10px auto; width: 80%;">
+                        <div style="display: grid; grid-template-columns: 1fr 10px 1fr; grid-template-rows: 80px 80px; border: 2px solid black; background-color: white; margin: 10px auto; width: 85%;">
                             <div style="border: 1px solid #ccc; background-color: {court_colors[0]};"></div>
                             <div style="grid-row: span 2; background-color: #333;"></div>
                             <div style="border: 1px solid #ccc; background-color: {court_colors[1]};"></div>
@@ -143,10 +141,9 @@ if st.session_state.players is not None:
                         </div>
                         """
                         st.markdown(court_html, unsafe_allow_html=True)
-                        if is_finished:
-                            st.success(f"WINNER: {p1+' & '+p2 if s1 > s2 else p3+' & '+p4}")
+                        if is_finished: st.success(f"WINNER: {p1+' & '+p2 if s1 > s2 else p3+' & '+p4}")
 
-                    with c3: # TEAM 2 Right
+                    with c3: # TEAM 2
                         st.caption("TEAM 2")
                         st.markdown(f"<div style='border:1px solid black; padding:5px; text-align:center; {'background-color:#c6efce; font-weight:bold;' if server_idx==1 and not is_finished else ''}'>{p3}</div>", unsafe_allow_html=True)
                         st.markdown(f"<div style='border:1px solid black; padding:5px; text-align:center; {'background-color:#c6efce; font-weight:bold;' if server_idx==3 and not is_finished else ''}'>{p4}</div>", unsafe_allow_html=True)
@@ -154,11 +151,9 @@ if st.session_state.players is not None:
                         if not is_finished:
                             b2_col1, b2_col2 = st.columns(2)
                             if b2_col1.button("＋", key=f"p2_{label}", use_container_width=True):
-                                st.session_state[s2_key] = min(target_score, s2 + 1)
-                                st.rerun()
+                                st.session_state[s2_key] = min(target_score, s2 + 1); st.rerun()
                             if b2_col2.button("－", key=f"m2_{label}", use_container_width=True):
-                                st.session_state[s2_key] = max(0, s2 - 1)
-                                st.rerun()
+                                st.session_state[s2_key] = max(0, s2 - 1); st.rerun()
 
                     scores_update[p1] = s1; scores_update[p2] = s1
                     scores_update[p3] = s2; scores_update[p4] = s2
