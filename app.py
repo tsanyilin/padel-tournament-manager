@@ -20,16 +20,13 @@ with st.sidebar:
     st.title("⚙️ Tournament Setup")
     mode = st.radio("Tournament Mode", ["Mexicano (Competitive)", "Americano (Social)"])
     
-    # 1. Select total number of players
     num_p = st.number_input("Total Players", min_value=4, value=8, step=1)
     
     st.divider()
+    target_score = st.number_input("Winning Score (Target)", min_value=1, value=12)
     
-    # 2. Dynamic Input Fields for Player Names
     st.subheader("👥 Player Names")
     player_names_input = []
-    
-    # Two-column layout for player name inputs
     input_col1, input_col2 = st.columns(2)
     for i in range(num_p):
         col = input_col1 if i % 2 == 0 else input_col2
@@ -37,18 +34,15 @@ with st.sidebar:
         player_names_input.append(name)
     
     st.divider()
-    
     num_courts = st.number_input("Number of Courts", min_value=1, value=max(1, num_p // 4), step=1)
     rental_hours = st.number_input("Total Rental Duration (Hours)", min_value=0.5, value=2.0, step=0.5)
     
     if st.button("🚀 Start & Shuffle", type="primary"):
-        # 3. Validation and Random Shuffling
         shuffled_names = [n.strip() for n in player_names_input if n.strip()]
         if len(shuffled_names) < num_p:
-            st.warning("Please fill in all player names before starting!")
+            st.warning("Please fill in all player names!")
         else:
-            random.shuffle(shuffled_names) # Execute random shuffle
-            
+            random.shuffle(shuffled_names)
             st.session_state.players = pd.DataFrame({
                 'Player ID': shuffled_names,
                 'Points': [0] * num_p,
@@ -58,26 +52,21 @@ with st.sidebar:
             st.session_state.start_time = datetime.now()
             st.rerun()
 
-    st.divider()
-    st.markdown("### 🙌 Support Development")
-    st.write("Created by Lin. Support via PayPay:")
-    st.code("PayPay ID: tsanyilin")
+    if st.button("🔄 Reset Tournament"):
+        st.session_state.players = None
+        st.rerun()
 
 # --- Main Dashboard ---
 if st.session_state.players is not None:
-    # Calculate Time Management
     end_time = st.session_state.start_time + timedelta(hours=rental_hours)
     time_left = end_time - datetime.now()
     minutes_left = max(0, int(time_left.total_seconds() / 60))
 
-    # Top Status Bar
     t_col1, t_col2, t_col3 = st.columns(3)
     t_col1.metric("Current Round", st.session_state.round)
-    t_col2.metric("Total Rental Time", f"{rental_hours}h")
-    # Metric turns red (Inverse) if less than 15 minutes left
-    t_col3.metric("Rental Time Left", f"{minutes_left} min", 
-                  delta="- Urgent" if minutes_left < 15 else None, 
-                  delta_color="inverse")
+    t_col2.metric("Target Score", target_score)
+    t_col3.metric("Time Remaining", f"{minutes_left} min", 
+                  delta="- Urgent" if minutes_left < 15 else None, delta_color="inverse")
 
     st.divider()
     
@@ -86,49 +75,61 @@ if st.session_state.players is not None:
     with col_play:
         st.subheader("🎮 Active Matches")
         court_labels = list(string.ascii_uppercase)[:num_courts]
-        
-        # Sorting for Mexicano Logic: Based on points
         sorted_list = st.session_state.players.sort_values(by='Points', ascending=False)['Player ID'].tolist()
         
-        max_on_court = num_courts * 4
-        on_court = sorted_list[:max_on_court]
-        waiting = sorted_list[max_on_court:]
+        on_court = sorted_list[:num_courts * 4]
+        waiting = sorted_list[num_courts * 4:]
         
         scores_update = {}
+        all_courts_finished = True 
         
         for i, label in enumerate(court_labels):
             idx = i * 4
             if idx + 3 < len(on_court):
                 t1, t2 = [on_court[idx], on_court[idx+1]], [on_court[idx+2], on_court[idx+3]]
                 
-                with st.expander(f"🏟️ Court {label} - [Round {st.session_state.round}]", expanded=True):
+                with st.expander(f"🏟️ Court {label}", expanded=True):
                     c_info, c_score = st.columns([2, 1])
+                    
+                    # 1. Score Input
+                    with c_score:
+                        s1 = st.number_input(f"T1 Score", min_value=0, max_value=target_score, key=f"s1_{label}_{st.session_state.round}")
+                        s2 = st.number_input(f"T2 Score", min_value=0, max_value=target_score, key=f"s2_{label}_{st.session_state.round}")
+                        
+                        if s1 < target_score and s2 < target_score:
+                            all_courts_finished = False
+                        else:
+                            st.success("Finished!")
+
+                    # 2. Service Indicator Logic
                     with c_info:
                         st.markdown(f"**{t1[0]} & {t1[1]}** vs **{t2[0]} & {t2[1]}**")
-                        st.caption(f"Rental Ends at: {end_time.strftime('%H:%M')}")
-                    
-                    with c_score:
-                        s1 = st.number_input(f"T1 Score", min_value=0, key=f"s1_{label}_{st.session_state.round}")
-                        s2 = st.number_input(f"T2 Score", min_value=0, key=f"s2_{label}_{st.session_state.round}")
+                        
+                        # Calculate service side
+                        total_points = s1 + s2
+                        service_side = "RIGHT (Deuce Side)" if total_points % 2 == 0 else "LEFT (Ad Side)"
+                        
+                        st.info(f"🎾 **Next Service From:** {service_side}")
+                        st.caption(f"Total points played: {total_points}")
                     
                     for p in t1: scores_update[p] = s1
                     for p in t2: scores_update[p] = s2
 
         if waiting:
-            st.warning(f"⏳ **Waiting List / Next Up:** {', '.join(waiting)}")
+            st.warning(f"⏳ **Waiting List:** {', '.join(waiting)}")
 
-        if st.button("✅ Submit & Next Round", use_container_width=True):
-            for p, s in scores_update.items():
-                st.session_state.players.loc[st.session_state.players['Player ID'] == p, 'Points'] += s
-                st.session_state.players.loc[st.session_state.players['Player ID'] == p, 'Matches'] += 1
-            st.session_state.round += 1
-            st.rerun()
+        if all_courts_finished:
+            if st.button("🎉 Finish Round & Rotate", type="primary", use_container_width=True):
+                for p, s in scores_update.items():
+                    st.session_state.players.loc[st.session_state.players['Player ID'] == p, 'Points'] += s
+                    st.session_state.players.loc[st.session_state.players['Player ID'] == p, 'Matches'] += 1
+                st.session_state.round += 1
+                st.rerun()
+        else:
+            st.button("Wait for all courts to finish...", disabled=True, use_container_width=True)
 
     with col_rank:
         st.subheader("🏆 Leaderboard")
         rank_df = st.session_state.players.sort_values(by='Points', ascending=False)
         st.dataframe(rank_df, use_container_width=True, hide_index=True)
         st.bar_chart(rank_df.set_index('Player ID')['Points'])
-
-else:
-    st.info("👈 Please enter player names in the sidebar and click 'Start & Shuffle' to begin.")
