@@ -39,7 +39,7 @@ LANG_DICT = {
         "live": "進行中",
         "team": "チーム",
         "leaderboard": "ランキング",
-        "desc_ame": "🇺🇸 **Americano**: 毎ラウンド、ペアはランダム。交流重視。",
+        "desc_ame": "🇺🇸 **Americano**: ラウンドごとに、ペアはランダム。交流重視。",
         "desc_mex": "🇲🇽 **Mexicano**: 順位でペア決定（1位&4位 vs 2位&3位）。実力均衡。",
         "time_up": "⏰ 時間終了！"
     },
