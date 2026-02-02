@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 # --- Page Configuration ---
 st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🎾")
 
-# Initialize Session State
 if 'players' not in st.session_state:
     st.session_state.players = None
 if 'round' not in st.session_state:
@@ -88,7 +87,6 @@ if st.session_state.players is not None:
         for i, label in enumerate(court_labels):
             idx = i * 4
             if idx + 3 < len(on_court):
-                # Teams: T1(P1, P2) vs T2(P3, P4)
                 p1, p2, p3, p4 = on_court[idx], on_court[idx+1], on_court[idx+2], on_court[idx+3]
                 
                 s1_key = f"s1_{label}_{st.session_state.round}"
@@ -98,31 +96,55 @@ if st.session_state.players is not None:
                 is_finished = current_s1 >= target_score or current_s2 >= target_score
 
                 with st.expander(f"🏟️ Court {label} {'✅ FINISHED' if is_finished else '🔥 LIVE'}", expanded=not is_finished):
-                    c_info, c_score = st.columns([2, 1])
+                    c_info, c_score = st.columns([3, 2])
                     
                     with c_score:
-                        s1 = st.number_input(f"T1 Score", min_value=0, max_value=target_score, key=s1_key, disabled=is_finished)
-                        s2 = st.number_input(f"T2 Score", min_value=0, max_value=target_score, key=s2_key, disabled=is_finished)
+                        s1 = st.number_input(f"Team 1 Score", min_value=0, max_value=target_score, key=s1_key, disabled=is_finished)
+                        s2 = st.number_input(f"Team 2 Score", min_value=0, max_value=target_score, key=s2_key, disabled=is_finished)
                         if not is_finished: all_courts_finished = False
+                        
+                        if is_finished:
+                            st.success(f"Winner: {p1+' & '+p2 if s1 > s2 else p3+' & '+p4}")
 
                     with c_info:
-                        st.markdown(f"**{p1} & {p2}** vs **{p3} & {p4}**")
-                        
                         if not is_finished:
                             total_pts = s1 + s2
-                            # Server Rotation Logic (Changes every 4 points)
-                            # 0-3: P1, 4-7: P3, 8-11: P2, 12-15: P4...
-                            rotation = [p1, p3, p2, p4]
+                            # Rotation: P1 -> P3 -> P2 -> P4
+                            # Sides: Even = Right (Deuce), Odd = Left (Ad)
                             server_idx = (total_pts // 4) % 4
-                            current_server = rotation[server_idx]
+                            side_idx = total_pts % 2 # 0: Right, 1: Left
                             
-                            # Side Logic (Every point)
-                            side = "RIGHT (Deuce)" if total_pts % 2 == 0 else "LEFT (Ad)"
+                            # Visual Court Representation
+                            bg = ["", "", "", ""] # P1, P2, P3, P4 name backgrounds
+                            court_colors = ["white", "white", "white", "white"] # Court zones
                             
-                            st.info(f"👤 **Server:** {current_server}")
-                            st.write(f"🎾 **Side:** {side}")
+                            # Determine highlighting
+                            bg[server_idx] = "background-color: #c6efce; border: 2px solid #006100;"
+                            
+                            # Court grid indexing: 
+                            # Team 1 (Left/Top in drawing): Deuce is Bottom-Left, Ad is Top-Left
+                            # Team 2 (Right/Bottom in drawing): Deuce is Top-Right, Ad is Bottom-Right
+                            if server_idx == 0 or server_idx == 2: # Team 1 Serving
+                                court_colors[2 if side_idx == 0 else 0] = "#c6efce"
+                            else: # Team 2 Serving
+                                court_colors[1 if side_idx == 0 else 3] = "#c6efce"
+
+                            court_html = f"""
+                            <div style="font-family: sans-serif; max-width: 300px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                    <div style="flex:1; border:1px solid black; padding:5px; text-align:center; {bg[0]}">{p1}</div>
+                                    <div style="flex:1; border:1px solid black; padding:5px; text-align:center; {bg[1]}">{p2}</div>
+                                    <div style="width:10px;"></div>
+                                    <div style="flex:1; border:1px solid black; padding:5px; text-align:center; {bg[2]}">{p3}</div>
+                                    <div style="flex:1; border:1px solid black; padding:5px; text-align:center; {bg[3]}">{p4}</div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 10px 1fr; grid-template-rows: 60px 60px; border: 2px solid black; background-color: white;">
+                                    <div style="border: 1px solid #ddd; background-color: {court_colors[0]};"></div> <div style="grid-row: span 2; background-color: #444;"></div> <div style="border: 1px solid #ddd; background-color: {court_colors[1]};"></div> <div style="border: 1px solid #ddd; background-color: {court_colors[2]};"></div> <div style="border: 1px solid #ddd; background-color: {court_colors[3]};"></div> </div>
+                            </div>
+                            """
+                            st.markdown(court_html, unsafe_allow_html=True)
                         else:
-                            st.success(f"Winner: {p1+' & '+p2 if s1 > s2 else p3+' & '+p4}")
+                            st.write("Match Completed.")
                     
                     for p in [p1, p2]: scores_update[p] = s1
                     for p in [p3, p4]: scores_update[p] = s2
