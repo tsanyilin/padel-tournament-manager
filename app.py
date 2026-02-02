@@ -21,27 +21,25 @@ LANG_DICT = {
         "live": "LIVE",
         "team": "TEAM",
         "leaderboard": "Leaderboard",
-        "desc_ame": "🇺🇸 **Americano**: Random pairing each round.",
-        "desc_mex": "🇲🇽 **Mexicano**: Pairing by ranking (1&4 vs 2&3).",
+        "next_up": "👀 NEXT UP",
         "time_up": "⏰ TIME IS UP!"
     },
     "日本語": {
         "setup": "大会設定",
         "format": "試合形式",
-        "logic_play": "総得点制",
-        "logic_win": "勝利点制",
+        "logic_play": "総得點制",
+        "logic_win": "勝利點制",
         "logic_time": "時間制",
         "duration": "試合時間 (分)",
         "target": "目標スコア",
-        "courts": "コート数",
+        "courts": "コート數",
         "generate": "🚀 試合開始",
         "confirm": "🎉 確定して次へ",
         "finished": "終了",
         "live": "進行中",
         "team": "チーム",
         "leaderboard": "ランキング",
-        "desc_ame": "🇺🇸 **Americano**: 毎ラウンドランダムなペア。",
-        "desc_mex": "🇲🇽 **Mexicano**: 順位によるペア（1位&4位 vs 2位&3位）。",
+        "next_up": "👀 次の試合",
         "time_up": "⏰ 時間終了！"
     },
     "中文": {
@@ -59,8 +57,7 @@ LANG_DICT = {
         "live": "進行中",
         "team": "隊伍",
         "leaderboard": "排行榜",
-        "desc_ame": "🇺🇸 **Americano**: 每一輪隨機分配隊友。",
-        "desc_mex": "🇲🇽 **Mexicano**: 排名配對（1&4 vs 2&3），實力平均。",
+        "next_up": "👀 下一組預告",
         "time_up": "⏰ 時間到！"
     }
 }
@@ -80,10 +77,6 @@ with st.sidebar:
     st.header(t["setup"])
     
     tourney_type = st.selectbox(t["format"], ["Americano", "Mexicano"])
-    if tourney_type == "Americano": st.info(t["desc_ame"])
-    else: st.info(t["desc_mex"])
-    
-    st.divider()
     point_logic = st.selectbox("Logic", [t["logic_play"], t["logic_win"], t["logic_time"]])
     
     if point_logic == t["logic_time"]:
@@ -93,13 +86,10 @@ with st.sidebar:
     else:
         st.subheader(t["target"])
         score_options = [12, 16, 20, 24, 32, "Custom"]
-        selected_target = st.selectbox("Score Select", options=score_options, index=3)
+        selected_target = st.selectbox("Score", options=score_options, index=3)
         target = selected_target if selected_target != "Custom" else st.number_input("Value", min_value=1, value=24)
     
-    st.divider()
     num_p = st.number_input("Players", min_value=4, value=8, step=1)
-    
-    # 新增：手動選擇球場數量
     max_c = max(1, num_p // 4)
     num_c = st.selectbox(t["courts"], options=list(range(1, max_c + 1)), index=max_c-1)
     
@@ -112,43 +102,45 @@ with st.sidebar:
         st.session_state.num_courts = num_c
         st.session_state.round = 1
         st.session_state.start_time = time.time()
+        # 預生成下一輪順序
+        next_n = valid_n.copy()
+        random.shuffle(next_n)
+        st.session_state.next_roster = next_n
         st.rerun()
 
 # --- 4. Main Dashboard ---
 if st.session_state.players is not None:
     st.title(f"{tourney_type} - Round {st.session_state.round}")
     
-    if point_logic == t["logic_time"] and st.session_state.start_time:
-        elapsed = time.time() - st.session_state.start_time
-        remaining = max(0, (game_duration * 60) - elapsed)
-        mins, secs = divmod(int(remaining), 60)
-        st.progress(remaining / (game_duration * 60))
-        st.subheader(f"⏱️ {mins:02d}:{secs:02d}")
-        if remaining <= 0: st.warning(t["time_up"])
+    # 頂部狀態欄 (時間 + 下一組預告)
+    stat_l, stat_r = st.columns([2, 1])
+    with stat_l:
+        if point_logic == t["logic_time"] and st.session_state.start_time:
+            elapsed = time.time() - st.session_state.start_time
+            remaining = max(0, (game_duration * 60) - elapsed)
+            mins, secs = divmod(int(remaining), 60)
+            st.progress(remaining / (game_duration * 60))
+            st.markdown(f"### ⏱️ {mins:02d}:{secs:02d}")
+            if remaining <= 0: st.warning(t["time_up"])
+
+    with stat_r:
+        if tourney_type == "Americano" and 'next_roster' in st.session_state:
+            with st.expander(t["next_up"], expanded=True):
+                next_p = st.session_state.next_roster
+                for c in range(st.session_state.num_courts):
+                    st.caption(f"Court {string.ascii_uppercase[c]}: {next_p[c*4]} & {next_p[c*4+1]} vs {next_p[c*4+2]} & {next_p[c*4+3]}")
 
     col_play, col_rank = st.columns([2.5, 1])
 
     with col_play:
-        # 排序邏輯（Mexicano 依積分，Americano 依隨機）
-        if tourney_type == "Mexicano" and st.session_state.round > 1:
-            sorted_p = st.session_state.players.sort_values(by='Points', ascending=False)
-            roster = sorted_p['Player'].tolist()
-        else:
-            # 每一輪開始前若非 Mexicano 則隨機
-            roster = st.session_state.players['Player'].tolist()
-
+        roster = st.session_state.players['Player'].tolist()
         num_active = st.session_state.num_courts * 4
         active_players = roster[:num_active]
-        waiting_players = roster[num_active:]
-
         all_done, scores_round = True, {}
 
         for i in range(st.session_state.num_courts):
-            # Mexicano 1&4 vs 2&3 配對邏輯
-            p1, p4, p2, p3 = active_players[i*4 : i*4+4]
-            # 重新排列為 p1, p2 (Team1) vs p3, p4 (Team2)
-            p1, p2, p3, p4 = p1, p4, p2, p3
-            
+            # 依你的圖示對齊 p1, p2 vs p3, p4
+            p1, p2, p3, p4 = active_players[i*4 : i*4+4]
             s1_k, s2_k = f"s1_{i}_{st.session_state.round}", f"s2_{i}_{st.session_state.round}"
             if s1_k not in st.session_state: st.session_state[s1_k] = 0
             if s2_k not in st.session_state: st.session_state[s2_k] = 0
@@ -159,76 +151,19 @@ if st.session_state.players is not None:
             if not is_done: all_done = False
 
             with st.container(border=True):
-                st.markdown(f"#### COURT {string.ascii_uppercase[i]} <span style='float:right;'>{t['finished'] if is_done else t['live']}</span>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#ddd; color:black; text-align:center; font-weight:bold; margin-bottom:10px;'>COURT {string.ascii_uppercase[i]}</div>", unsafe_allow_html=True)
                 
                 total = s1 + s2
                 srv_idx = (total // 4) % 4
                 side_idx = total % 2 
-                rotation = [p1, p3, p2, p4]
+                rotation = [p1, p3, p2, p4] # 發球順序
 
-                c_l, c_m, c_r = st.columns([1, 1.5, 1])
+                c_l, c_m, c_r = st.columns([1, 1.2, 1])
                 
                 with c_l:
-                    st.caption(f"{t['team']} 1")
+                    st.caption(f"TEAM 1")
                     for p in [p1, p2]:
-                        bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "transparent"
-                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg}; color:{'black' if bg != 'transparent' else 'white'};'>{p}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<h1 style='text-align:center;'>{s1}</h1>", unsafe_allow_html=True)
-                    if not is_done:
-                        b1, b2 = st.columns(2)
-                        if b1.button("＋", key=f"a1_{i}"): st.session_state[s1_k] += 1; st.rerun()
-                        if b2.button("－", key=f"m1_{i}"): st.session_state[s1_k] = max(0, s1-1); st.rerun()
-
-                with c_m:
-                    colors = ["#333"] * 4
-                    if not is_done:
-                        active = (2 if side_idx == 0 else 0) if srv_idx in [0, 2] else (1 if side_idx == 0 else 3)
-                        colors[active] = "#c6efce"
-                    st.markdown(f"""
-                    <div style="display: grid; grid-template-columns: 1fr 10px 1fr; grid-template-rows: 50px 50px; border: 2px solid #555; background-color: #222; margin: 10px auto; width: 90%;">
-                        <div style="background-color:{colors[0]}; border:0.5px solid #444;"></div>
-                        <div style="grid-row:span 2; background-color:#555;"></div>
-                        <div style="background-color:{colors[1]}; border:0.5px solid #444;"></div>
-                        <div style="background-color:{colors[2]}; border:0.5px solid #444;"></div>
-                        <div style="background-color:{colors[3]}; border:0.5px solid #444;"></div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                with c_r:
-                    st.caption(f"{t['team']} 2")
-                    for p in [p3, p4]:
-                        bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "transparent"
-                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg}; color:{'black' if bg != 'transparent' else 'white'};'>{p}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<h1 style='text-align:center;'>{s2}</h1>", unsafe_allow_html=True)
-                    if not is_done:
-                        b1, b2 = st.columns(2)
-                        if b1.button("＋ ", key=f"a2_{i}"): st.session_state[s2_k] += 1; st.rerun()
-                        if b2.button("－ ", key=f"m2_{i}"): st.session_state[s2_k] = max(0, s2-1); st.rerun()
-                
-                scores_round[p1] = s1; scores_round[p2] = s1
-                scores_round[p3] = s2; scores_round[p4] = s2
-
-        # 顯示休息中的玩家
-        if waiting_players:
-            st.warning(f"⏳ Waiting: {', '.join(waiting_players)}")
-
-        if all_done:
-            if st.button(t["confirm"], type="primary", use_container_width=True):
-                # 更新積分與隨機邏輯同前...
-                for i in range(st.session_state.num_courts):
-                    sc1 = st.session_state[f"s1_{i}_{st.session_state.round}"]
-                    sc2 = st.session_state[f"s2_{i}_{st.session_state.round}"]
-                    # (標準化邏輯省略...)
-                    # ... 寫入積分到 st.session_state.players
-                
-                # 每輪結束後自動重排
-                p_list = st.session_state.players['Player'].tolist()
-                random.shuffle(p_list)
-                st.session_state.players = st.session_state.players.set_index('Player').loc[p_list].reset_index()
-                st.session_state.round += 1
-                st.session_state.start_time = time.time()
-                st.rerun()
-
-    with col_rank:
-        st.subheader(t["leaderboard"])
-        st.dataframe(st.session_state.players.sort_values(by='Points', ascending=False), hide_index=True, use_container_width=True)
+                        bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "#262730"
+                        color = "black" if bg == "#c6efce" else "white"
+                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg}; color:{color};'>{p}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<h1 style='text-align:center; font-size:60px; margin:10px 0;'>{s1}</h1>", unsafe
