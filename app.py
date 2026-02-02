@@ -19,23 +19,38 @@ with st.sidebar:
     st.title("⚙️ Tournament Setup")
     mode = st.radio("Tournament Mode", ["Mexicano (Competitive)", "Americano (Social)"])
     
-    num_p = st.number_input("Total Players", min_value=4, value=8, step=1)
-    num_courts = st.number_input("Number of Courts", min_value=1, value=num_p // 4, step=1)
+    # 1. 改成輸入玩家姓名列表
+    st.subheader("👥 Players")
+    players_input = st.text_area(
+        "輸入玩家姓名 (每行一位)", 
+        value="Alice\nBob\nCharlie\nDave\nEve\nFrank\nGrace\nHank",
+        height=200
+    )
+    # 將輸入轉換為清單並過濾掉空白行
+    player_names = [name.strip() for name in players_input.split('\n') if name.strip()]
+    num_p = len(player_names)
+    
+    st.info(f"當前報名人數: {num_p} 人")
+    
+    num_courts = st.number_input("Number of Courts", min_value=1, value=max(1, num_p // 4), step=1)
     
     st.divider()
     st.subheader("⏰ Court Rental Settings")
-    # New: Input for total rental duration
     rental_hours = st.number_input("Total Rental Duration (Hours)", min_value=0.5, value=2.0, step=0.5)
     
     if st.button("🚀 Start Tournament", type="primary"):
-        st.session_state.players = pd.DataFrame({
-            'Player ID': [f"P{i+1}" for i in range(num_p)],
-            'Points': [0] * num_p,
-            'Matches': [0] * num_p
-        })
-        st.session_state.round = 1
-        st.session_state.start_time = datetime.now()
-        st.rerun()
+        if num_p < 4:
+            st.error("至少需要 4 位玩家才能開始！")
+        else:
+            # 2. 初始化 DataFrame 時使用玩家名稱
+            st.session_state.players = pd.DataFrame({
+                'Player ID': player_names, # 這裡現在存的是名字
+                'Points': [0] * num_p,
+                'Matches': [0] * num_p
+            })
+            st.session_state.round = 1
+            st.session_state.start_time = datetime.now()
+            st.rerun()
 
     st.divider()
     st.markdown("### 🙌 Support Development")
@@ -44,7 +59,9 @@ with st.sidebar:
 
 # --- Main Dashboard ---
 if st.session_state.players is not None:
-    # Calculate Time Management
+    # 這裡的邏輯不需要改動，因為原本就是抓取 'Player ID' 欄位
+    # 現在該欄位儲存的是姓名，會自動顯示在畫面與圖表上
+    
     end_time = st.session_state.start_time + timedelta(hours=rental_hours)
     time_left = end_time - datetime.now()
     minutes_left = max(0, int(time_left.total_seconds() / 60))
@@ -53,7 +70,6 @@ if st.session_state.players is not None:
     t_col1, t_col2, t_col3 = st.columns(3)
     t_col1.metric("Current Round", st.session_state.round)
     t_col2.metric("Total Rental Time", f"{rental_hours}h")
-    # Time Left metric turns red if less than 15 mins
     t_col3.metric("Rental Time Left", f"{minutes_left} min", 
                   delta="- Urgent" if minutes_left < 15 else None, 
                   delta_color="inverse")
@@ -81,6 +97,7 @@ if st.session_state.players is not None:
                 with st.expander(f"🏟️ Court {label} - [Live Assignment]", expanded=True):
                     c_info, c_score = st.columns([2, 1])
                     with c_info:
+                        # 顯示姓名會更清楚
                         st.markdown(f"**{t1[0]} & {t1[1]}** vs **{t2[0]} & {t2[1]}**")
                         st.caption(f"Rental Ends at: {end_time.strftime('%H:%M')}")
                     
@@ -108,4 +125,4 @@ if st.session_state.players is not None:
         st.bar_chart(rank_df.set_index('Player ID')['Points'])
 
 else:
-    st.info("👈 Please set the 'Total Rental Duration' and click 'Start Tournament'.")
+    st.info("👈 Please input player names and click 'Start Tournament'.")
