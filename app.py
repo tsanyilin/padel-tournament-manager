@@ -4,7 +4,7 @@ import string
 import random
 from datetime import datetime
 
-# --- 1. Translation Dictionary ---
+# --- 1. Translation Dictionary (含賽制解釋) ---
 LANG_DICT = {
     "English": {
         "setup": "Tournament Setup",
@@ -19,7 +19,8 @@ LANG_DICT = {
         "live": "LIVE",
         "team": "TEAM",
         "leaderboard": "Leaderboard",
-        "intro_title": "🎾 What are Americano & Mexicano?"
+        "desc_ame": "🇺🇸 **Americano**: Players are randomly paired each round. High social rotation.",
+        "desc_mex": "🇲🇽 **Mexicano**: Pairs based on ranking (e.g., 1&4 vs 2&3). More competitive and balanced."
     },
     "日本語": {
         "setup": "大会設定",
@@ -34,7 +35,8 @@ LANG_DICT = {
         "live": "進行中",
         "team": "チーム",
         "leaderboard": "ランキング",
-        "intro_title": "🎾 Americano と Mexicano の違い"
+        "desc_ame": "🇺🇸 **Americano**: 毎ラウンド、ペアはランダムにシャッフルされます。交流重視の形式です。",
+        "desc_mex": "🇲🇽 **Mexicano**: ランキングに基づいてペアを決定（例：1位&4位 vs 2位&3位）。実力が均衡する対戦形式です。"
     },
     "中文": {
         "setup": "賽事設定",
@@ -49,7 +51,8 @@ LANG_DICT = {
         "live": "進行中",
         "team": "隊伍",
         "leaderboard": "排行榜",
-        "intro_title": "🎾 什麼是 Americano 與 Mexicano？"
+        "desc_ame": "🇺🇸 **Americano**: 每一輪隨機分配隊友，適合社交與認識新朋友。",
+        "desc_mex": "🇲🇽 **Mexicano**: 根據排名分配（如 1&4 vs 2&3），讓比賽實力更平均、更刺激。"
     }
 }
 
@@ -71,8 +74,16 @@ with st.sidebar:
     st.divider()
     st.header(t["setup"])
     
-    # 新增：賽制選擇 (Americano / Mexicano)
+    # 賽制選擇與即時解釋
     tourney_type = st.selectbox(t["format"], ["Americano", "Mexicano"])
+    
+    # 在選單下方直接顯示對應語言的解釋
+    if tourney_type == "Americano":
+        st.info(t["desc_ame"])
+    else:
+        st.info(t["desc_mex"])
+        
+    st.divider()
     
     point_logic = st.selectbox("Logic", [t["logic_play"], t["logic_win"], t["logic_time"]])
     
@@ -90,29 +101,10 @@ with st.sidebar:
     
     if st.button(t["generate"], type="primary", use_container_width=True):
         valid_n = [n.strip() for n in player_names if n.strip()]
-        # Americano 初始隨機，Mexicano 第一輪也通常是隨機
         random.shuffle(valid_n)
         st.session_state.players = pd.DataFrame({'Player': valid_n, 'Points': [0]*len(valid_n)})
         st.session_state.round = 1
         st.rerun()
-
-    st.divider()
-    # 要求的介紹區塊
-    with st.expander(t["intro_title"]):
-        if st.session_state.lang == "中文":
-            st.markdown("""
-            **🇺🇸 Americano (美式賽制)**
-            - **核心：** 每一輪隨機配對。
-            - **計分：** 每場打固定總分（如24分），13-11 則個人各拿 13 或 11 分。
-            - **特色：** 社交性強，能跟所有人搭檔。
-
-            **🇲🇽 Mexicano (墨式賽制)**
-            - **核心：** 根據排名配對（強弱搭配）。
-            - **邏輯：** 通常排名 1&4 vs 2&3，讓比賽更激烈平衡。
-            - **特色：** 越打越刺激，實力越接近。
-            """)
-        else:
-            st.markdown("Details about Americano and Mexicano formats...")
 
 # --- 4. Main Dashboard ---
 if st.session_state.players is not None:
@@ -120,16 +112,15 @@ if st.session_state.players is not None:
     col_play, col_rank = st.columns([2.5, 1])
 
     with col_play:
-        # 如果是 Mexicano 且不是第一輪，可以根據排名調整 roster
+        # Mexicano 排名配對邏輯 (1&4, 2&3)
         if tourney_type == "Mexicano" and st.session_state.round > 1:
             sorted_players = st.session_state.players.sort_values(by='Points', ascending=False)
             roster = sorted_players['Player'].tolist()
-            # 簡單 Mexicano 邏輯：1,4,2,3 一組 (Court A), 5,8,6,7 一組 (Court B)
             new_roster = []
             for i in range(0, len(roster), 4):
                 group = roster[i:i+4]
                 if len(group) == 4:
-                    new_roster.extend([group[0], group[3], group[1], group[2]]) # 1&4 vs 2&3
+                    new_roster.extend([group[0], group[3], group[1], group[2]]) 
                 else:
                     new_roster.extend(group)
             roster = new_roster
@@ -171,7 +162,14 @@ if st.session_state.players is not None:
                         if b2.button("－", key=f"m1_{i}", use_container_width=True): st.session_state[s1_k] = max(0, s1-1); st.rerun()
 
                 with c_m:
-                    st.markdown(f"""<div style="height:120px; border:2px solid #555; background-color:#222; display:flex; align-items:center; justify-content:center; color:#555;">COURT</div>""", unsafe_allow_html=True)
+                    # 簡易網球場圖形
+                    st.markdown(f"""
+                    <div style="display: grid; grid-template-columns: 1fr 5px 1fr; height:100px; border:2px solid #555; background-color:#222;">
+                        <div style="border-right:1px dashed #444;"></div>
+                        <div style="background-color:#555;"></div>
+                        <div style="border-left:1px dashed #444;"></div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with c_r:
                     st.caption(f"{t['team']} 2")
@@ -192,11 +190,10 @@ if st.session_state.players is not None:
                 for p, s in scores_round.items():
                     st.session_state.players.loc[st.session_state.players['Player'] == p, 'Points'] += s
                 
-                # 如果是 Americano，下一輪前隨機打亂
+                # Americano 下一輪前隨機
                 if tourney_type == "Americano":
                     current_players = st.session_state.players['Player'].tolist()
                     random.shuffle(current_players)
-                    # 這裡簡單處理：直接重排 DataFrame 順序供下一輪讀取
                     st.session_state.players = st.session_state.players.set_index('Player').loc[current_players].reset_index()
                 
                 st.session_state.round += 1
