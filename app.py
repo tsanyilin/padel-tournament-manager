@@ -23,7 +23,7 @@ LANG_DICT = {
     },
     "中文": {
         "setup": "賽事設定", "logic_play": "總分制", "logic_win": "搶分制",
-        "logic_time": "限時制", "target": "目標分數", "generate": "🚀 生成對戰",
+        "logic_time": "限時制", "target": "目標分數", "generate": "🚀 生成對戰表",
         "confirm": "🎉 確認並下一輪", "finished": "已結束", "live": "進行中", "team": "隊伍"
     }
 }
@@ -37,49 +37,49 @@ if 'round' not in st.session_state: st.session_state.round = 1
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'target_score' not in st.session_state: st.session_state.target_score = 24
 
-# Sidebar Language Selector
+# Language Selector
 with st.sidebar:
-    st.session_state.lang = st.selectbox("🌐 Language", list(LANG_DICT.keys()))
+    st.session_state.lang = st.selectbox("🌐 Language / 言語 / Langue / Idioma / 語言", list(LANG_DICT.keys()))
     t = LANG_DICT[st.session_state.lang]
 
-# --- 3. Sidebar Logic ---
+# --- 3. Sidebar Configuration ---
 with st.sidebar:
     st.divider()
     st.header(t["setup"])
     point_logic = st.selectbox("Logic", [t["logic_play"], t["logic_win"], t["logic_time"]])
     
     st.subheader(t["target"])
+    preset_scores = [12, 16, 20, 24, 32, "Custom"]
     score_cols = st.columns(3)
-    for s in [12, 16, 20, 24, 32, "Custom"]:
-        if score_cols[preset_scores.index(s)%3 if 'preset_scores' in locals() else 0].button(str(s), key=f"s_{s}"):
+    for idx, s in enumerate(preset_scores):
+        if score_cols[idx % 3].button(str(s), key=f"score_btn_{s}", use_container_width=True):
             st.session_state.target_score = s
     
-    target = st.session_state.target_score if st.session_state.target_score != "Custom" else st.number_input("Pts", value=24)
+    target = st.session_state.target_score if st.session_state.target_score != "Custom" else st.number_input("Value", min_value=1, value=24)
     
     num_p = st.number_input("Players", min_value=4, value=8)
-    player_names = [st.sidebar.text_input(f"P{i+1}", value=f"Player {i+1}", key=f"pi_{i}") for i in range(num_p)]
+    player_names = [st.sidebar.text_input(f"P{i+1}", value=f"Player {i+1}", key=f"pin_{i}") for i in range(num_p)]
     
     if st.button(t["generate"], type="primary", use_container_width=True):
-        valid = [n.strip() for n in player_names if n.strip()]
-        random.shuffle(valid)
-        st.session_state.players = pd.DataFrame({'Player': valid, 'Points': [0]*len(valid)})
+        valid_n = [n.strip() for n in player_names if n.strip()]
+        random.shuffle(valid_n)
+        st.session_state.players = pd.DataFrame({'Player': valid_n, 'Points': [0]*len(valid_n)})
         st.session_state.start_time = datetime.now()
         st.session_state.round = 1
         st.rerun()
 
-# --- 4. Main UI ---
+# --- 4. Main Dashboard ---
 if st.session_state.players is not None:
     st.title(f"Round {st.session_state.round}")
     col_play, col_rank = st.columns([2.5, 1])
 
     with col_play:
-        current_players = st.session_state.players['Player'].tolist()
-        num_courts = len(current_players) // 4
-        
+        roster = st.session_state.players['Player'].tolist()
+        num_courts = len(roster) // 4
         all_done, scores_round = True, {}
 
         for i in range(num_courts):
-            p1, p2, p3, p4 = current_players[i*4 : i*4+4]
+            p1, p2, p3, p4 = roster[i*4 : i*4+4]
             s1_k, s2_k = f"s1_{i}_{st.session_state.round}", f"s2_{i}_{st.session_state.round}"
             
             if s1_k not in st.session_state: st.session_state[s1_k] = 0
@@ -92,7 +92,6 @@ if st.session_state.players is not None:
             with st.container(border=True):
                 st.markdown(f"#### COURT {string.ascii_uppercase[i]} <span style='float:right;'>{t['finished'] if is_done else t['live']}</span>", unsafe_allow_html=True)
                 
-                # Service Logic
                 total = s1 + s2
                 srv_idx = (total // 4) % 4
                 side_idx = total % 2 
@@ -100,28 +99,24 @@ if st.session_state.players is not None:
 
                 c_l, c_m, c_r = st.columns([1, 1.5, 1])
                 
-                # --- TEAM 1 ---
+                # TEAM 1
                 with c_l:
                     st.caption(f"{t['team']} 1")
-                    for j, p in enumerate([p1, p2]):
+                    for p in [p1, p2]:
                         bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "transparent"
-                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg};'>{p}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<h1 style='text-align:center; margin:0;'>{s1}</h1>", unsafe_allow_html=True)
-                    
+                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg}; color:{'black' if bg != 'transparent' else 'white'};'>{p}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<h1 style='text-align:center;'>{s1}</h1>", unsafe_allow_html=True)
                     if not is_done:
-                        b_l, b_r = st.columns(2)
-                        if b_l.button("＋", key=f"add1_{i}", use_container_width=True): 
-                            st.session_state[s1_k] += 1; st.rerun()
-                        if b_r.button("－", key=f"sub1_{i}", use_container_width=True): 
-                            st.session_state[s1_k] = max(0, s1 - 1); st.rerun()
+                        b1, b2 = st.columns(2)
+                        if b1.button("＋", key=f"a1_{i}", use_container_width=True): st.session_state[s1_k] += 1; st.rerun()
+                        if b2.button("－", key=f"m1_{i}", use_container_width=True): st.session_state[s1_k] = max(0, s1-1); st.rerun()
 
-                # --- COURT VISUAL ---
-                with c_mid:
+                # COURT VISUAL (The Fix for your Error)
+                with c_m:
                     colors = ["#333"] * 4
                     if not is_done:
-                        # Correcting colors: Light green for active zone
-                        active_idx = (2 if side_idx == 0 else 0) if srv_idx in [0, 2] else (1 if side_idx == 0 else 3)
-                        colors[active_idx] = "#c6efce"
+                        active = (2 if side_idx == 0 else 0) if srv_idx in [0, 2] else (1 if side_idx == 0 else 3)
+                        colors[active] = "#c6efce"
                     
                     st.markdown(f"""
                     <div style="display: grid; grid-template-columns: 1fr 10px 1fr; grid-template-rows: 60px 60px; border: 2px solid #555; background-color: #222; margin: 10px auto; width: 90%;">
@@ -133,20 +128,17 @@ if st.session_state.players is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                # --- TEAM 2 ---
+                # TEAM 2
                 with c_r:
                     st.caption(f"{t['team']} 2")
-                    for j, p in enumerate([p3, p4]):
+                    for p in [p3, p4]:
                         bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "transparent"
-                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg};'>{p}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<h1 style='text-align:center; margin:0;'>{s2}</h1>", unsafe_allow_html=True)
-                    
+                        st.markdown(f"<div style='border:1px solid #555; padding:5px; text-align:center; background-color:{bg}; color:{'black' if bg != 'transparent' else 'white'};'>{p}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<h1 style='text-align:center;'>{s2}</h1>", unsafe_allow_html=True)
                     if not is_done:
-                        b_l, b_r = st.columns(2)
-                        if b_l.button("＋ ", key=f"add2_{i}", use_container_width=True): 
-                            st.session_state[s2_k] += 1; st.rerun()
-                        if b_r.button("－ ", key=f"sub2_{i}", use_container_width=True): 
-                            st.session_state[s2_k] = max(0, s2 - 1); st.rerun()
+                        b1, b2 = st.columns(2)
+                        if b1.button("＋ ", key=f"a2_{i}", use_container_width=True): st.session_state[s2_k] += 1; st.rerun()
+                        if b2.button("－ ", key=f"m2_{i}", use_container_width=True): st.session_state[s2_k] = max(0, s2-1); st.rerun()
                 
                 scores_round[p1] = s1; scores_round[p2] = s1
                 scores_round[p3] = s2; scores_round[p4] = s2
