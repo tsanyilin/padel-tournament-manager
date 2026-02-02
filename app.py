@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import string
+import random
 from datetime import datetime, timedelta
 
 # --- Page Configuration ---
@@ -19,32 +20,37 @@ with st.sidebar:
     st.title("⚙️ Tournament Setup")
     mode = st.radio("Tournament Mode", ["Mexicano (Competitive)", "Americano (Social)"])
     
-    # 1. 改成輸入玩家姓名列表
-    st.subheader("👥 Players")
-    players_input = st.text_area(
-        "輸入玩家姓名 (每行一位)", 
-        value="Alice\nBob\nCharlie\nDave\nEve\nFrank\nGrace\nHank",
-        height=200
-    )
-    # 將輸入轉換為清單並過濾掉空白行
-    player_names = [name.strip() for name in players_input.split('\n') if name.strip()]
-    num_p = len(player_names)
-    
-    st.info(f"當前報名人數: {num_p} 人")
-    
-    num_courts = st.number_input("Number of Courts", min_value=1, value=max(1, num_p // 4), step=1)
+    # 1. Select total number of players
+    num_p = st.number_input("Total Players", min_value=4, value=8, step=1)
     
     st.divider()
-    st.subheader("⏰ Court Rental Settings")
+    
+    # 2. Dynamic Input Fields for Player Names
+    st.subheader("👥 Player Names")
+    player_names_input = []
+    
+    # Two-column layout for player name inputs
+    input_col1, input_col2 = st.columns(2)
+    for i in range(num_p):
+        col = input_col1 if i % 2 == 0 else input_col2
+        name = col.text_input(f"P{i+1}", value=f"Player {i+1}", key=f"input_p{i}")
+        player_names_input.append(name)
+    
+    st.divider()
+    
+    num_courts = st.number_input("Number of Courts", min_value=1, value=max(1, num_p // 4), step=1)
     rental_hours = st.number_input("Total Rental Duration (Hours)", min_value=0.5, value=2.0, step=0.5)
     
-    if st.button("🚀 Start Tournament", type="primary"):
-        if num_p < 4:
-            st.error("至少需要 4 位玩家才能開始！")
+    if st.button("🚀 Start & Shuffle", type="primary"):
+        # 3. Validation and Random Shuffling
+        shuffled_names = [n.strip() for n in player_names_input if n.strip()]
+        if len(shuffled_names) < num_p:
+            st.warning("Please fill in all player names before starting!")
         else:
-            # 2. 初始化 DataFrame 時使用玩家名稱
+            random.shuffle(shuffled_names) # Execute random shuffle
+            
             st.session_state.players = pd.DataFrame({
-                'Player ID': player_names, # 這裡現在存的是名字
+                'Player ID': shuffled_names,
                 'Points': [0] * num_p,
                 'Matches': [0] * num_p
             })
@@ -55,13 +61,11 @@ with st.sidebar:
     st.divider()
     st.markdown("### 🙌 Support Development")
     st.write("Created by Lin. Support via PayPay:")
-    st.code("PayPay ID: lin_tsanyi")
+    st.code("PayPay ID: tsanyilin")
 
 # --- Main Dashboard ---
 if st.session_state.players is not None:
-    # 這裡的邏輯不需要改動，因為原本就是抓取 'Player ID' 欄位
-    # 現在該欄位儲存的是姓名，會自動顯示在畫面與圖表上
-    
+    # Calculate Time Management
     end_time = st.session_state.start_time + timedelta(hours=rental_hours)
     time_left = end_time - datetime.now()
     minutes_left = max(0, int(time_left.total_seconds() / 60))
@@ -70,6 +74,7 @@ if st.session_state.players is not None:
     t_col1, t_col2, t_col3 = st.columns(3)
     t_col1.metric("Current Round", st.session_state.round)
     t_col2.metric("Total Rental Time", f"{rental_hours}h")
+    # Metric turns red (Inverse) if less than 15 minutes left
     t_col3.metric("Rental Time Left", f"{minutes_left} min", 
                   delta="- Urgent" if minutes_left < 15 else None, 
                   delta_color="inverse")
@@ -81,6 +86,8 @@ if st.session_state.players is not None:
     with col_play:
         st.subheader("🎮 Active Matches")
         court_labels = list(string.ascii_uppercase)[:num_courts]
+        
+        # Sorting for Mexicano Logic: Based on points
         sorted_list = st.session_state.players.sort_values(by='Points', ascending=False)['Player ID'].tolist()
         
         max_on_court = num_courts * 4
@@ -94,22 +101,21 @@ if st.session_state.players is not None:
             if idx + 3 < len(on_court):
                 t1, t2 = [on_court[idx], on_court[idx+1]], [on_court[idx+2], on_court[idx+3]]
                 
-                with st.expander(f"🏟️ Court {label} - [Live Assignment]", expanded=True):
+                with st.expander(f"🏟️ Court {label} - [Round {st.session_state.round}]", expanded=True):
                     c_info, c_score = st.columns([2, 1])
                     with c_info:
-                        # 顯示姓名會更清楚
                         st.markdown(f"**{t1[0]} & {t1[1]}** vs **{t2[0]} & {t2[1]}**")
                         st.caption(f"Rental Ends at: {end_time.strftime('%H:%M')}")
                     
                     with c_score:
-                        s1 = st.number_input(f"Score T1", min_value=0, key=f"s1_{label}_{st.session_state.round}")
-                        s2 = st.number_input(f"Score T2", min_value=0, key=f"s2_{label}_{st.session_state.round}")
+                        s1 = st.number_input(f"T1 Score", min_value=0, key=f"s1_{label}_{st.session_state.round}")
+                        s2 = st.number_input(f"T2 Score", min_value=0, key=f"s2_{label}_{st.session_state.round}")
                     
                     for p in t1: scores_update[p] = s1
                     for p in t2: scores_update[p] = s2
 
         if waiting:
-            st.warning(f"⏳ **Waiting List / Referees:** {', '.join(waiting)}")
+            st.warning(f"⏳ **Waiting List / Next Up:** {', '.join(waiting)}")
 
         if st.button("✅ Submit & Next Round", use_container_width=True):
             for p, s in scores_update.items():
@@ -125,4 +131,4 @@ if st.session_state.players is not None:
         st.bar_chart(rank_df.set_index('Player ID')['Points'])
 
 else:
-    st.info("👈 Please input player names and click 'Start Tournament'.")
+    st.info("👈 Please enter player names in the sidebar and click 'Start & Shuffle' to begin.")
