@@ -17,6 +17,7 @@ LANG_DICT = {
         "courts": "Number of Courts",
         "generate": "🚀 GENERATE",
         "confirm": "🎉 CONFIRM & NEXT",
+        "undo": "🔙 UNDO / GO BACK",
         "finished": "FINISHED",
         "live": "LIVE",
         "team": "TEAM",
@@ -35,6 +36,7 @@ LANG_DICT = {
         "courts": "コート数",
         "generate": "🚀 試合開始",
         "confirm": "🎉 確定して次へ",
+        "undo": "🔙 前のラウンドに戻る",
         "finished": "終了",
         "live": "進行中",
         "team": "チーム",
@@ -53,6 +55,7 @@ LANG_DICT = {
         "courts": "球場數量",
         "generate": "🚀 生成對戰表",
         "confirm": "🎉 確認並下一輪",
+        "undo": "🔙 撤銷回上一輪",
         "finished": "已結束",
         "live": "進行中",
         "team": "隊伍",
@@ -65,10 +68,12 @@ LANG_DICT = {
 # --- 2. Configuration ---
 st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🎾")
 
+# 初始化 Session States
 if 'lang' not in st.session_state: st.session_state.lang = "中文"
 if 'players' not in st.session_state: st.session_state.players = None
 if 'round' not in st.session_state: st.session_state.round = 1
 if 'start_time' not in st.session_state: st.session_state.start_time = None
+if 'history' not in st.session_state: st.session_state.history = []
 
 with st.sidebar:
     st.session_state.lang = st.selectbox("🌐 Language", list(LANG_DICT.keys()))
@@ -90,7 +95,6 @@ with st.sidebar:
         target = selected_target if selected_target != "Custom" else st.number_input("Value", min_value=1, value=24)
     
     num_p = st.number_input("Players", min_value=4, value=8, step=1, max_value=100)
-    # 解鎖球場上限到 6
     max_c = min(6, num_p // 4)
     num_c = st.selectbox(t["courts"], options=list(range(1, max_c + 1)), index=max(0, max_c-1))
     
@@ -103,7 +107,8 @@ with st.sidebar:
         st.session_state.num_courts = num_c
         st.session_state.round = 1
         st.session_state.start_time = time.time()
-        # 預生成下一輪名單
+        st.session_state.history = [] # 重置時清空歷史
+        
         next_gen = valid_n.copy()
         random.shuffle(next_gen)
         st.session_state.next_roster = next_gen
@@ -113,7 +118,7 @@ with st.sidebar:
 if st.session_state.players is not None:
     st.title(f"{tourney_type} - Round {st.session_state.round}")
     
-    # 頂部時間條
+    # Timer Display
     if point_logic == t["logic_time"] and st.session_state.start_time:
         elapsed = time.time() - st.session_state.start_time
         remaining = max(0, (game_duration * 60) - elapsed)
@@ -128,7 +133,7 @@ if st.session_state.players is not None:
         roster = st.session_state.players['Player'].tolist()
         num_active = st.session_state.num_courts * 4
         active_players = roster[:num_active]
-        all_done, scores_round = True, {}
+        all_done = True
 
         for i in range(st.session_state.num_courts):
             p1, p2, p3, p4 = active_players[i*4 : i*4+4]
@@ -137,11 +142,12 @@ if st.session_state.players is not None:
             if s2_k not in st.session_state: st.session_state[s2_k] = 0
             
             s1, s2 = st.session_state[s1_k], st.session_state[s2_k]
+            
+            # 判斷該球場是否完賽
             is_done = (s1 + s2) >= target if t["logic_play"] in point_logic else (s1 >= target or s2 >= target)
             if point_logic == t["logic_time"]: is_done = (remaining <= 0)
             if not is_done: all_done = False
 
-            # --- Court UI Container ---
             with st.container(border=True):
                 st.markdown(f"<div style='background-color:#555; color:white; text-align:center; padding:3px; font-weight:bold;'>COURT {string.ascii_uppercase[i]}</div>", unsafe_allow_html=True)
                 
@@ -159,10 +165,15 @@ if st.session_state.players is not None:
                         txt = "black" if bg == "#c6efce" else "white"
                         st.markdown(f"<div style='border:1px solid #444; padding:5px; text-align:center; background-color:{bg}; color:{txt}; font-size:14px; border-radius:4px;'>{p}</div>", unsafe_allow_html=True)
                     st.markdown(f"<h1 style='text-align:center; font-size:55px; margin:5px 0;'>{s1}</h1>", unsafe_allow_html=True)
-                    if not is_done:
-                        b1, b2 = st.columns(2)
-                        if b1.button("＋", key=f"a1_{i}", use_container_width=True): st.session_state[s1_k] += 1; st.rerun()
-                        if b2.button("－", key=f"m1_{i}", use_container_width=True): st.session_state[s1_k] = max(0, s1-1); st.rerun()
+                    
+                    # 修改分區：即使完賽，依然保留按鈕以便「改錯」
+                    b1, b2 = st.columns(2)
+                    if b1.button("＋", key=f"a1_{i}", use_container_width=True, disabled=is_done): 
+                        st.session_state[s1_k] += 1
+                        st.rerun()
+                    if b2.button("－", key=f"m1_{i}", use_container_width=True): 
+                        st.session_state[s1_k] = max(0, s1-1)
+                        st.rerun()
 
                 with c_m:
                     colors = ["#333"] * 4
@@ -186,12 +197,15 @@ if st.session_state.players is not None:
                         txt = "black" if bg == "#c6efce" else "white"
                         st.markdown(f"<div style='border:1px solid #444; padding:5px; text-align:center; background-color:{bg}; color:{txt}; font-size:14px; border-radius:4px;'>{p}</div>", unsafe_allow_html=True)
                     st.markdown(f"<h1 style='text-align:center; font-size:55px; margin:5px 0;'>{s2}</h1>", unsafe_allow_html=True)
-                    if not is_done:
-                        b1, b2 = st.columns(2)
-                        if b1.button("＋ ", key=f"a2_{i}", use_container_width=True): st.session_state[s2_k] += 1; st.rerun()
-                        if b2.button("－ ", key=f"m2_{i}", use_container_width=True): st.session_state[s2_k] = max(0, s2-1); st.rerun()
+                    
+                    b1, b2 = st.columns(2)
+                    if b1.button("＋ ", key=f"a2_{i}", use_container_width=True, disabled=is_done): 
+                        st.session_state[s2_k] += 1
+                        st.rerun()
+                    if b2.button("－ ", key=f"m2_{i}", use_container_width=True): 
+                        st.session_state[s2_k] = max(0, s2-1)
+                        st.rerun()
                 
-                # --- 新增：美式賽制下一組顯示在 Court 下方 ---
                 if tourney_type == "Americano" and 'next_roster' in st.session_state:
                     next_p = st.session_state.next_roster
                     if len(next_p) >= (i+1)*4:
@@ -201,34 +215,54 @@ if st.session_state.players is not None:
                             <span style='font-size:13px;'>{next_p[i*4]} & {next_p[i*4+1]} <span style='color:#555;'>vs</span> {next_p[i*4+2]} & {next_p[i*4+3]}</span>
                         </div>
                         """, unsafe_allow_html=True)
-                
-                scores_round[p1] = s1; scores_round[p2] = s1
-                scores_round[p3] = s2; scores_round[p4] = s2
 
+        # --- 底部控制區：確認下一輪 & 撤銷 ---
         if all_done:
             st.divider()
-            if st.button(t["confirm"], type="primary", use_container_width=True):
-                for i in range(st.session_state.num_courts):
-                    p_active = active_players[i*4 : i*4+4]
-                    sc1 = st.session_state[f"s1_{i}_{st.session_state.round}"]
-                    sc2 = st.session_state[f"s2_{i}_{st.session_state.round}"]
-                    if point_logic == t["logic_time"] and (sc1 + sc2) > 0:
-                        ratio = norm_target / (sc1 + sc2)
-                        sc1, sc2 = round(sc1 * ratio, 1), round(sc2 * ratio, 1)
-                    for p in p_active[:2]: st.session_state.players.loc[st.session_state.players['Player'] == p, 'Points'] += sc1
-                    for p in p_active[2:]: st.session_state.players.loc[st.session_state.players['Player'] == p, 'Points'] += sc2
-                
-                # 下一輪名單生效
-                st.session_state.players = st.session_state.players.set_index('Player').loc[st.session_state.next_roster].reset_index()
-                
-                # 重新隨機生成「再下一輪」的預告
-                new_next = st.session_state.players['Player'].tolist()
-                random.shuffle(new_next)
-                st.session_state.next_roster = new_next
-                
-                st.session_state.round += 1
-                st.session_state.start_time = time.time()
-                st.rerun()
+            col_confirm, col_undo = st.columns(2)
+            
+            with col_confirm:
+                if st.button(t["confirm"], type="primary", use_container_width=True):
+                    # 結算前先拍照留存 (快照)
+                    snapshot = {
+                        "players": st.session_state.players.copy(),
+                        "round": st.session_state.round,
+                        "next_roster": st.session_state.next_roster.copy()
+                    }
+                    st.session_state.history.append(snapshot)
+                    
+                    # 計算並累加分數
+                    for j in range(st.session_state.num_courts):
+                        p_active = active_players[j*4 : j*4+4]
+                        sc1 = st.session_state[f"s1_{j}_{st.session_state.round}"]
+                        sc2 = st.session_state[f"s2_{j}_{st.session_state.round}"]
+                        if point_logic == t["logic_time"] and (sc1 + sc2) > 0:
+                            ratio = norm_target / (sc1 + sc2)
+                            sc1, sc2 = round(sc1 * ratio, 1), round(sc2 * ratio, 1)
+                        for p in p_active[:2]: st.session_state.players.loc[st.session_state.players['Player'] == p, 'Points'] += sc1
+                        for p in p_active[2:]: st.session_state.players.loc[st.session_state.players['Player'] == p, 'Points'] += sc2
+                    
+                    # 下一輪名單生效
+                    st.session_state.players = st.session_state.players.set_index('Player').loc[st.session_state.next_roster].reset_index()
+                    
+                    # 生成再下一輪的預告
+                    new_next = st.session_state.players['Player'].tolist()
+                    random.shuffle(new_next)
+                    st.session_state.next_roster = new_next
+                    
+                    st.session_state.round += 1
+                    st.session_state.start_time = time.time()
+                    st.rerun()
+
+            with col_undo:
+                # 只要 history 有東西，就顯示 UNDO 按鈕
+                if st.session_state.history:
+                    if st.button(t["undo"], use_container_width=True):
+                        last_state = st.session_state.history.pop() # 彈出最後一筆
+                        st.session_state.players = last_state["players"]
+                        st.session_state.round = last_state["round"]
+                        st.session_state.next_roster = last_state["next_roster"]
+                        st.rerun()
 
     with col_rank:
         st.subheader(t["leaderboard"])
