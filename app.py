@@ -7,26 +7,59 @@ from datetime import datetime, timedelta
 # --- 1. Translation Dictionary ---
 LANG_DICT = {
     "English": {
-        "setup": "Tournament Setup", "logic_play": "Points to Play (Total)", "logic_win": "Points to Win",
-        "logic_time": "Time Play", "target": "Target Score", "generate": "🚀 GENERATE",
-        "confirm": "🎉 CONFIRM & NEXT", "finished": "FINISHED", "live": "LIVE", "team": "TEAM"
+        "setup": "Tournament Setup",
+        "logic_play": "Points to Play (Total)",
+        "logic_win": "Points to Win",
+        "logic_time": "Time Play",
+        "target": "Target Score",
+        "generate": "🚀 GENERATE",
+        "confirm": "🎉 CONFIRM & NEXT",
+        "finished": "FINISHED",
+        "live": "LIVE",
+        "team": "TEAM",
+        "leaderboard": "Leaderboard"
     },
     "日本語": {
-        "setup": "大会設定", "logic_play": "総得点制", "logic_win": "勝利点制",
-        "logic_time": "時間制", "target": "目標スコア", "generate": "🚀 試合開始",
-        "confirm": "🎉 確定して次へ", "finished": "終了", "live": "進行中", "team": "チーム"
+        "setup": "大会設定",
+        "logic_play": "総得点制",
+        "logic_win": "勝利点制",
+        "logic_time": "時間制",
+        "target": "目標スコア",
+        "generate": "🚀 試合開始",
+        "confirm": "🎉 確定して次へ",
+        "finished": "終了",
+        "live": "進行中",
+        "team": "チーム",
+        "leaderboard": "ランキング"
     },
     "Español": {
-        "setup": "Configuración", "logic_play": "Puntos a Jugar", "logic_win": "Puntos para Ganar",
-        "logic_time": "Tiempo de Juego", "target": "Objetivo", "generate": "🚀 GENERAR",
-        "confirm": "🎉 CONFIRMAR Y SIGUIENTE", "finished": "FINALIZADO", "live": "EN JUEGO", "team": "EQUIPO"
+        "setup": "Configuración",
+        "logic_play": "Puntos a Jugar",
+        "logic_win": "Puntos para Ganar",
+        "logic_time": "Tiempo de Juego",
+        "target": "Objetivo",
+        "generate": "🚀 GENERAR",
+        "confirm": "🎉 CONFIRMAR Y SIGUIENTE",
+        "finished": "FINALIZADO",
+        "live": "EN JUEGO",
+        "team": "EQUIPO",
+        "leaderboard": "Clasificación"
     },
     "中文": {
-        "setup": "賽事設定", "logic_play": "總分制", "logic_win": "搶分制",
-        "logic_time": "限時制", "target": "目標分數", "generate": "🚀 生成對戰表",
-        "confirm": "🎉 確認並下一輪", "finished": "已結束", "live": "進行中", "team": "隊伍"
+        "setup": "賽事設定",
+        "logic_play": "總分制",
+        "logic_win": "搶分制",
+        "logic_time": "限時制",
+        "target": "目標分數",
+        "generate": "🚀 生成對戰表",
+        "confirm": "🎉 確認並下一輪",
+        "finished": "已結束",
+        "live": "進行中",
+        "team": "隊伍",
+        "leaderboard": "排行榜"
     }
 }
+
 
 # --- 2. Configuration ---
 st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🎾")
