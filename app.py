@@ -66,7 +66,7 @@ LANG_DICT = {
 }
 
 # --- 2. Configuration & Session State ---
-st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🎾")
+st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🏆")
 
 # 初始化所有狀態
 states = {
