@@ -4,18 +4,18 @@ import string
 import random
 import time
 
-# --- 1. Translation Dictionary ---
+# --- 1. Translation Dictionary (Padel Branded) ---
 LANG_DICT = {
     "English": {
-        "setup": "Tennis Tournament Setup",
-        "format": "Match Format",
+        "setup": "Padel Tournament Setup",
+        "format": "Tournament Format",
         "logic_play": "Points to Play (Total)",
         "logic_win": "Points to Win",
         "logic_time": "Time Play",
         "duration": "Duration (Minutes)",
         "target": "Target Score",
-        "courts": "Number of Tennis Courts",
-        "generate": "🚀 GENERATE TABLE",
+        "courts": "Number of Padel Courts",
+        "generate": "🚀 GENERATE PADEL TABLE",
         "confirm": "🎉 CONFIRM & NEXT ROUND",
         "undo": "🔙 UNDO / GO BACK",
         "live": "LIVE MATCHES",
@@ -26,7 +26,7 @@ LANG_DICT = {
         "download": "📥 Download Tournament Report"
     },
     "日本語": {
-        "setup": "テニス大会設定",
+        "setup": "パデル大会設定",
         "format": "試合形式",
         "logic_play": "総得点制",
         "logic_win": "勝利点制",
@@ -41,11 +41,11 @@ LANG_DICT = {
         "leaderboard": "ランキング",
         "next_up": "次はこちら",
         "time_up": "⏰ 時間終了！",
-        "history": "対戰紀錄",
+        "history": "対戦記録",
         "download": "📥 CSVレポートをダウンロード"
     },
     "中文": {
-        "setup": "網球賽事設定",
+        "setup": "Padel 賽事設定",
         "format": "賽制選擇",
         "logic_play": "總分制",
         "logic_win": "搶分制",
@@ -66,7 +66,7 @@ LANG_DICT = {
 }
 
 # --- 2. Configuration & Session State ---
-st.set_page_config(page_title="Tennis Manager Pro", layout="wide", page_icon="🎾")
+st.set_page_config(page_title="Padel Manager Pro", layout="wide", page_icon="🏆")
 
 if 'lang' not in st.session_state: st.session_state.lang = "中文"
 if 'players' not in st.session_state: st.session_state.players = None
@@ -95,6 +95,7 @@ with st.sidebar:
         selected_target = st.selectbox(t["target"], options=score_options, index=3)
         target = selected_target if selected_target != "Custom" else st.number_input("Value", min_value=1, value=24)
     
+    # --- 動態球員管理 ---
     st.subheader(f"👥 Players ({len(st.session_state.player_list)})")
     current_names = []
     for i, name in enumerate(st.session_state.player_list):
@@ -117,11 +118,12 @@ with st.sidebar:
     max_c = min(6, len(st.session_state.player_list) // 4)
     num_c_select = st.selectbox(t["courts"], options=list(range(1, max_c + 1)), index=max(0, max_c-1))
     
+    # --- 生成按鈕：自動歸零邏輯 ---
     if st.button(t["generate"], type="primary", use_container_width=True):
         valid_names = [n.strip() for n in st.session_state.player_list if n.strip()]
         random.shuffle(valid_names)
         
-        # 歸零邏輯
+        # 重置所有分數與紀錄
         st.session_state.players = pd.DataFrame({'Player': valid_names, 'Points': [0.0]*len(valid_names)})
         st.session_state.num_courts = num_c_select
         st.session_state.round = 1
@@ -129,7 +131,7 @@ with st.sidebar:
         st.session_state.history = []
         st.session_state.match_logs = []
         
-        # 清除舊分
+        # 清除輸入框緩存
         for key in list(st.session_state.keys()):
             if key.startswith("s1_") or key.startswith("s2_"): del st.session_state[key]
         
@@ -140,7 +142,7 @@ with st.sidebar:
 
 # --- 4. Main Dashboard ---
 if st.session_state.players is not None:
-    st.title(f"🎾 {tourney_type} Tennis - Round {st.session_state.round}")
+    st.title(f"🎾 {tourney_type} Padel - Round {st.session_state.round}")
     
     tab_live, tab_hist = st.tabs([f"🎾 {t['live']}", f"📜 {t['history']}"])
 
@@ -175,7 +177,7 @@ if st.session_state.players is not None:
                 if not is_done: all_done = False
 
                 with st.container(border=True):
-                    st.markdown(f"<div style='background-color:#00712D; color:white; text-align:center; padding:3px; font-weight:bold;'>COURT {string.ascii_uppercase[i]}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color:#444; color:white; text-align:center; padding:3px; font-weight:bold;'>PADEL COURT {string.ascii_uppercase[i]}</div>", unsafe_allow_html=True)
                     total_pts = s1 + s2
                     srv_idx = (total_pts // 4) % 4
                     side_idx = total_pts % 2 
@@ -184,8 +186,8 @@ if st.session_state.players is not None:
                     with c_l:
                         st.caption("TEAM 1")
                         for p in [p1, p2]:
-                            bg = "#D4E157" if (not is_done and rotation[srv_idx] == p) else "#1E1E1E"
-                            txt = "black" if bg == "#D4E157" else "white"
+                            bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "#1E1E1E"
+                            txt = "black" if bg == "#c6efce" else "white"
                             st.markdown(f"<div style='border:1px solid #444; padding:5px; text-align:center; background-color:{bg}; color:{txt}; font-size:13px; border-radius:4px;'>{p}</div>", unsafe_allow_html=True)
                         st.markdown(f"<h1 style='text-align:center; font-size:55px; margin:5px 0;'>{s1}</h1>", unsafe_allow_html=True)
                         b1, b2 = st.columns(2)
@@ -199,7 +201,7 @@ if st.session_state.players is not None:
                         colors = ["#333"] * 4
                         if not is_done:
                             active = (2 if side_idx == 0 else 0) if srv_idx in [0, 2] else (1 if side_idx == 0 else 3)
-                            colors[active] = "#D4E157"
+                            colors[active] = "#c6efce"
                         st.markdown(f"""
                         <div style="display: grid; grid-template-columns: 1fr 6px 1fr; grid-template-rows: 55px 55px; border: 2px solid #555; background-color: #222; margin-top: 30px;">
                             <div style="background-color:{colors[0]}; border:0.5px solid #444;"></div>
@@ -212,8 +214,8 @@ if st.session_state.players is not None:
                     with c_r:
                         st.caption("TEAM 2")
                         for p in [p3, p4]:
-                            bg = "#D4E157" if (not is_done and rotation[srv_idx] == p) else "#1E1E1E"
-                            txt = "black" if bg == "#D4E157" else "white"
+                            bg = "#c6efce" if (not is_done and rotation[srv_idx] == p) else "#1E1E1E"
+                            txt = "black" if bg == "#c6efce" else "white"
                             st.markdown(f"<div style='border:1px solid #444; padding:5px; text-align:center; background-color:{bg}; color:{txt}; font-size:13px; border-radius:4px;'>{p}</div>", unsafe_allow_html=True)
                         st.markdown(f"<h1 style='text-align:center; font-size:55px; margin:5px 0;'>{s2}</h1>", unsafe_allow_html=True)
                         b1, b2 = st.columns(2)
@@ -256,25 +258,14 @@ if st.session_state.players is not None:
                             st.rerun()
 
         with col_rank:
-            # --- 排行榜修正區 ---
+            # --- 排行榜：修復名字覆蓋與金銀銅牌標示 ---
             st.subheader(f"🏆 {t['leaderboard']}")
-            # 1. 複製目前的積分表並排序，同時重置 Index
             ranked_df = st.session_state.players.sort_values(by='Points', ascending=False).reset_index(drop=True)
-            
-            # 2. 修正：只針對前三名添加獎牌，不再覆蓋整欄
             if not ranked_df.empty:
-                # 取得 'Player' 欄位的索引位置
-                p_col_idx = ranked_df.columns.get_loc('Player')
-                
-                # 第一名 🥇
-                ranked_df.iloc[0, p_col_idx] = f"{ranked_df.iloc[0, p_col_idx]} 🥇"
-                # 第二名 🥈
-                if len(ranked_df) > 1:
-                    ranked_df.iloc[1, p_col_idx] = f"{ranked_df.iloc[1, p_col_idx]} 🥈"
-                # 第三名 🥉
-                if len(ranked_df) > 2:
-                    ranked_df.iloc[2, p_col_idx] = f"{ranked_df.iloc[2, p_col_idx]} 🥉"
-            
+                p_idx = ranked_df.columns.get_loc('Player')
+                ranked_df.iloc[0, p_idx] = f"{ranked_df.iloc[0, p_idx]} 🥇"
+                if len(ranked_df) > 1: ranked_df.iloc[1, p_idx] = f"{ranked_df.iloc[1, p_idx]} 🥈"
+                if len(ranked_df) > 2: ranked_df.iloc[2, p_idx] = f"{ranked_df.iloc[2, p_idx]} 🥉"
             st.dataframe(ranked_df, hide_index=True, use_container_width=True, height=500)
 
     with tab_hist:
@@ -282,6 +273,6 @@ if st.session_state.players is not None:
         if st.session_state.match_logs:
             df_logs = pd.DataFrame(st.session_state.match_logs)
             st.dataframe(df_logs.iloc[::-1], hide_index=True, use_container_width=True)
-            st.download_button(label=t["download"], data=df_logs.to_csv(index=False).encode('utf-8-sig'), file_name=f"tennis_report.csv", mime='text/csv')
+            st.download_button(label=t["download"], data=df_logs.to_csv(index=False).encode('utf-8-sig'), file_name=f"padel_report.csv", mime='text/csv')
         else: st.info("No records yet.")
-else: st.info("👈 Please enter player names and start the tennis tournament from the sidebar.")
+else: st.info("👈 Please enter player names and start the Padel tournament from the sidebar.")
